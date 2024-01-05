@@ -17,6 +17,7 @@ int pageNumber ;
     Message[] messageArray;
 
 JLabel pageNumberLabel;
+JLabel errorLabel;
     int firstEmailIndex;
     int lastEmailIndex;
 
@@ -26,11 +27,14 @@ JLabel pageNumberLabel;
         list_of_labels = new ArrayList<>();
 
         pageNumber = page;
+        errorLabel = new JLabel("NO AVAILABLE MESSAGES");
+        errorLabel.setForeground(Color.red);
         setBackground(new Color(219, 208, 208, 109));
         pageNumberLabel = new JLabel(String.valueOf(pageNumber));
         pageNumberLabel.setPreferredSize(new Dimension(30,10));
         mainComponentToBeAdded = componentToBeAdded;
         setLayout(new FlowLayout(FlowLayout.CENTER,3, (int) 5.5));
+        setName(String.valueOf(page));
         add(pageNumberLabel);
 
 
@@ -38,8 +42,9 @@ JLabel pageNumberLabel;
 
         for (int i =first; i<last ; i++) {
           add(new EmailMessageJButton(mainComponentToBeAdded,userMessage[i]));
-
         }
+
+
 
         // rightSidePanelScrollPane = new JScrollPane(messagesSpace,ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
        // rightSidePanelScrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(10,3));

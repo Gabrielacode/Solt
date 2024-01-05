@@ -6,16 +6,13 @@ package org.example;
 
 import org.jdesktop.swingx.JXLabel;
 
+
 import javax.mail.Folder;
 import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 import javax.swing.*;
-import javax.swing.event.CaretEvent;
-import javax.swing.event.CaretListener;
-import javax.swing.plaf.basic.BasicTextUI;
-import javax.swing.text.DefaultCaret;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.MutableTreeNode;
@@ -26,7 +23,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 
-import static java.lang.Thread.sleep;
+
 
 public class MainUI extends JFrame {
 
@@ -40,8 +37,13 @@ public class MainUI extends JFrame {
 
 
     GmailManager mainManager ;
-    // countOfEmailMessagePages tells us how many email message  pages are there
+    // countOfEmailMessagePages tells us how much email message  pages are there
         int countOfEmailMessagePages ;
+        //This states the current Folder
+        String currentFolder;
+
+        // This tells the main that a MessagePage from a Folder is already loading
+    boolean isaMessagePageLoading;
     JPanel main ;
 
     GridBagLayout loginPanelGridBagLayout;
@@ -58,7 +60,7 @@ public class MainUI extends JFrame {
     CardLayout mainSidePanelCardLayout;
 
     JPanel loginPanelInMainSidePanel;
-    Future<?>loginOperation = null;
+
 
     Runnable loadMessagesAfterLogin;
 
@@ -83,8 +85,10 @@ public class MainUI extends JFrame {
     JButton messageSpaceBackButton;
     JButton messageSpaceFrontButton;
     JButton removeAllButton;
+    JXLabel loadingMessagePageStatus;
     JPanel messagesSpace;
-    CardLayout messageSpaceLayout;
+    // The RXCardLayout class  is from https://github.com/tips4java/tips4java/blob/main/source/RXCardLayout.java. You can star his repo
+    RXCardLayout messageSpaceLayout;
     ArrayList<MessagePage> messagePages;
 
 
@@ -144,6 +148,9 @@ public class MainUI extends JFrame {
         loginPanelGridBagLayout = new GridBagLayout();
         loginPanelGridBagConstraints = new GridBagConstraints();
 
+        //Set the loadingAnyMessagePage boolean to false
+        isaMessagePageLoading = false;
+
 
 
         setTitle("Solt");
@@ -175,17 +182,15 @@ public class MainUI extends JFrame {
         bAfter = Math.abs(randomB.nextInt(0,255));
 
 
-        frameColorAnimation = new Runnable() {
-            @Override
-            public void run() {
-                while (true) {
-                    try {
-                        colorAnimation(true);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+        frameColorAnimation = () -> {
+            while (true) {
+                try {
+                    colorAnimation(true);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
-               }};
+            }
+           };
 
 
 // Register New Fonts
@@ -281,10 +286,12 @@ public class MainUI extends JFrame {
             try {
 
                 //At the start of the program we load the first three pages of emails
-                countOfEmailMessagePages = 0;
+
                 mainManager.initGmailManager();
                 gmail_folders_List = mainManager.loadFoldersFromSession();
-                userMessage = mainManager.loadMessagesFromInboxFolders(mainManager.loadFolderFromStore("Inbox").getMessageCount(),mainManager.loadFolderFromStore("Inbox").getMessageCount()-(3*MessagePage.MAXIMUM_AMOUNT_OF_EMAIL_LABELS));
+                //userMessage = mainManager.loadMessagesFromInboxFolders(mainManager.gmail_store.getFolder("Inbox").getMessageCount(),mainManager.gmail_store.getFolder("Inbox").getMessageCount()-((3*MessagePage.MAXIMUM_AMOUNT_OF_EMAIL_LABELS)));
+                currentFolder = mainManager.gmail_store.getFolder("Inbox").getName();
+                lazyLoadEmails(currentFolder,messagesSpace,messageSpaceLayout);
 
 
             } catch (MessagingException ex) {
@@ -299,47 +306,25 @@ public class MainUI extends JFrame {
         @Override
         protected void done() {
 
-            executors.execute(new Runnable() {
-                @Override
-                public void run() {
-
-                    int userMessageLength = userMessage.length;
-
-                   for (int i = 0; i <userMessageLength ; i++) {
-                          if ((i)%MessagePage.getMaximumAmountOfEmailLabels(messagesSpace)==0){
-                           if (i+11>=userMessageLength){
-                               countOfEmailMessagePages++;
-                               messagePages.add(new MessagePage(i,userMessageLength,userMessage,messagesSpace,countOfEmailMessagePages) );
-
-                           }else {
-                               countOfEmailMessagePages++;
-                               messagePages.add(new MessagePage(i, i + MessagePage.getMaximumAmountOfEmailLabels(messagesSpace), userMessage, messagesSpace, countOfEmailMessagePages));
-
-                           }}else continue;
-
-
-                    }
-                   messagePages.forEach((a)->messagesSpace.add(a));
-
+        executors.execute(new Runnable() {
+               @Override
+             public void run() {
 
 
                    gmail_folders_List.forEach((a)->{
                        try {
                            if(!a.getName().equalsIgnoreCase("[Gmail]")){
                            folderSpace.add(new Folders(folderSpace,MainUI.this,a,true,a.getName()));}
+                           System.out.println(a);
+                           System.out.println(a.getName());
                        } catch (MessagingException e) {
                            System.out.println(a.getName());
                            throw new RuntimeException(e);
                        }
                    });
 
+                   mainSidePanelCardLayout.show(mainSidePanel, "Message");
 
-
-
-
-
-
-                    mainSidePanelCardLayout.show(mainSidePanel, "Message");
                    Arrays.stream(leftSidePanel.getComponents()).forEach((a) -> {
                         a.setVisible(true);
                     });
@@ -424,7 +409,7 @@ public class MainUI extends JFrame {
 
 
             loginEmailAddress = new RoundedJTextField(25);
-            loginEmailAddress.setText("gabrielukpehdev@gmail.com");
+
 
             loginEmailAddress.setForeground(new Color(20,20,20,215));
             loginEmailAddress.setBackground(new Color(255,255,255,220));
@@ -469,7 +454,7 @@ public class MainUI extends JFrame {
             loginPanelInMainSidePanel.add(loginEmailAddress, loginPanelGridBagConstraints);
 
             loginPassword = new RoundedJPasswordField(25);
-            loginPassword.setText("puhctufhitlutdqi");
+
             //loginPassword.setOpaque(false);
         loginPassword.setForeground(new Color(20,20,20,215));
         loginPassword.setBackground(new Color(255,255,255,220));
@@ -534,7 +519,7 @@ public class MainUI extends JFrame {
 
        headerBarMessagePanel = new JPanel();
        headerBarMessagePanel.setBackground(new Color(0.0f, 0.0f, 0.0f, 0.5f));
-       headerBarMessagePanel.setLayout(new FlowLayout(FlowLayout.LEFT,5,1));
+       headerBarMessagePanel.setLayout(new FlowLayout(FlowLayout.LEADING,5,1));
        headerBarMessagePanel.setPreferredSize(new Dimension(mainPanelMessagePanel.getWidth(),50));
        mainPanelMessagePanel.add(headerBarMessagePanel,BorderLayout.NORTH);
 
@@ -543,7 +528,9 @@ public class MainUI extends JFrame {
        messageSpaceBackButton.addActionListener(new ActionListener() {
            @Override
            public void actionPerformed(ActionEvent e) {
-               messageSpaceLayout.previous(messagesSpace);
+              if (Integer.parseInt(messageSpaceLayout.getCurrentCard().getName())<=1){
+                  // Do Color Change
+              }else messageSpaceLayout.previous(messagesSpace);
            }
        });
         headerBarMessagePanel.add(messageSpaceBackButton);
@@ -551,7 +538,9 @@ public class MainUI extends JFrame {
         messageSpaceFrontButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                messageSpaceLayout.next(messagesSpace);
+
+                lazyLoadEmails(getCurrentFolder(),messagesSpace,messageSpaceLayout);
+
             }
         });
         headerBarMessagePanel.add(messageSpaceFrontButton);
@@ -566,7 +555,10 @@ public class MainUI extends JFrame {
         });
         headerBarMessagePanel.add(removeAllButton);
 
-       messageSpaceLayout = new CardLayout();
+        loadingMessagePageStatus  = new JXLabel("No Message Page Loading");
+        headerBarMessagePanel.add(loadingMessagePageStatus);
+
+       messageSpaceLayout = new RXCardLayout();
 
        messagesSpace = new JPanel();
        messagesSpace.setBackground(new Color(0,0,0,11));
@@ -997,12 +989,178 @@ public class MainUI extends JFrame {
       tr.insertNodeInto( newNode, (MutableTreeNode) tr.getRoot(),tr.getChildCount(tr.getRoot()));
 
   }
+  // This method allows you  to lazy load emails until the user is in a page before the email
+  public  void lazyLoadEmails ( String nameOfCurrentFolder , JComponent componentToAddTo, RXCardLayout cardLayoutMain){
+      if (isaMessagePageLoading){
+          System.out.println("A MessagePage is already loading");
+          return;
+
+      }else isaMessagePageLoading =true;
+        SwingWorker<MessagePage,Void> lazyLoader = new SwingWorker<MessagePage, Void>() {
+            @Override
+            protected MessagePage doInBackground() throws Exception {
+               if (componentToAddTo.getComponentCount()<=0){
+                   loadingMessagePageStatus.setText("Loading "+ currentFolder + ", MessagePage : "+ 1);
+                   //If there is no MessagePage on MessageSpace load the first page from the folder
+                   int start = mainManager.gmail_store.getFolder(nameOfCurrentFolder).getMessageCount();
+                   if (start<1) {
+                       this.cancel(true);
+                   }
+                   int end = start - MessagePage.MAXIMUM_AMOUNT_OF_EMAIL_LABELS;
+                   if (end <=1){
+                       end =1;
+                   }else  end = start -11;
+                   Message [] messages = mainManager.loadMessagesFromAFolder(nameOfCurrentFolder,start,end);
+
+                   if (start>end)  return  new MessagePage(0,start-end,messages,componentToAddTo,1);
+                   return new MessagePage(0,end-start,messages,componentToAddTo,1);
+               }else{
+                   if (cardLayoutMain.isNextCardAvailable()){
+                       return null;
+                   }else {
+                       // Get the index of the current MessagePage and makes a new MessagePage out of its values
+                       // The index of the current MessagePage is stored in the name of the Component
+                       int indexofCurrentPage = Integer.parseInt(cardLayoutMain.getCurrentCard().getName());
+                       loadingMessagePageStatus .setText(currentFolder + " , Message Page : "+ (indexofCurrentPage+1));
+                       int start = ((mainManager.gmail_store.getFolder(nameOfCurrentFolder).getMessageCount()) - (indexofCurrentPage*MessagePage.MAXIMUM_AMOUNT_OF_EMAIL_LABELS));
+
+                       if (start<1) {
+                           this.cancel(true);
+                       }
+                       int end = start -11;
+                       if (end <=1) {
+                           end = 1;
+                       }
+
+                       Message [] messages = mainManager.loadMessagesFromAFolder(nameOfCurrentFolder,start,end);
+
+                       if (start>end)  return  new MessagePage(0,start-end,messages,componentToAddTo,indexofCurrentPage+1);
+                       return new MessagePage(0,end-start,messages,componentToAddTo,indexofCurrentPage+1);
 
 
+                   }
+               }
+
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    MessagePage product = get();
+                    if (product!=null){
+                    componentToAddTo.add(get());}
+
+                    System.out.println("Done");
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                } catch (ExecutionException e) {
+                    throw new RuntimeException(e);
+                }catch (CancellationException e){
+                    SwingUtilities.invokeLater(()->loadingMessagePageStatus.setText("Page  Not Available"));
+                }
+                if (cardLayoutMain.isNextCardAvailable()){
+                    cardLayoutMain.next(componentToAddTo);
+                }
+                isaMessagePageLoading = false;
+                loadingMessagePageStatus.setText("No Message Page Loading");
+            }
+        };
+
+        lazyLoader.execute();
+
+  }
+    public  void lazyLoadEmailsFromFolder ( String nameOfCurrentFolder , JComponent componentToAddTo, RXCardLayout cardLayoutMain, boolean loadingFolder){
+        if (isaMessagePageLoading){
+            System.out.println("A MessagePage is already loading");
+            return;
+
+        }else isaMessagePageLoading =true;
+        componentToAddTo.removeAll();
+        loadingMessagePageStatus.setText("Loading "+ currentFolder + ", MessagePage : "+ 1);
+        SwingWorker<MessagePage,Void> lazyLoader = new SwingWorker<MessagePage, Void>() {
+            @Override
+            protected MessagePage doInBackground() throws Exception {
+                if (componentToAddTo.getComponentCount()<=0){
+                    //If there is no MessagePage on MessageSpace load the first page from the folder
+                    int start = mainManager.gmail_store.getFolder(nameOfCurrentFolder).getMessageCount();
+                    loadingMessagePageStatus.setText("Loading "+ currentFolder + ", MessagePage : "+ 1);
+                    if (start<1) {
+                        this.cancel(true);
+                    }
+                    int end = start - MessagePage.MAXIMUM_AMOUNT_OF_EMAIL_LABELS;
 
 
+                    if (end <=1){
+                        end =1;
+                    }else  end = start -11;
+                    Message [] messages = mainManager.loadMessagesFromAFolder(nameOfCurrentFolder,start,end);
+                    if (start>end)  return  new MessagePage(0,start-end,messages,componentToAddTo,1);
+                    return new MessagePage(0,end-start,messages,componentToAddTo,1);
+                }else{
+                    if (cardLayoutMain.isNextCardAvailable()){
+                        return null;
+                    }else {
+                        // Get the index of the current MessagePage and makes a new MessagePage out of its values
+                        // The index of the current MessagePage is stored in the name of the Component
+                        int indexofCurrentPage = Integer.parseInt(cardLayoutMain.getCurrentCard().getName());
+
+                        int start = ((mainManager.gmail_store.getFolder(nameOfCurrentFolder).getMessageCount()) - (indexofCurrentPage*MessagePage.MAXIMUM_AMOUNT_OF_EMAIL_LABELS));
+                        if (start<1) {
+                            this.cancel(true);
+                        }
+                        int end =start-MessagePage.MAXIMUM_AMOUNT_OF_EMAIL_LABELS ;
+                        if (end <=1){
+                            end =1;
+                        }else  end = start -11;
+                        Message [] messages = mainManager.loadMessagesFromAFolder(nameOfCurrentFolder,start,end);
+
+                        loadingMessagePageStatus .setText(currentFolder + " , Message Page : "+ (indexofCurrentPage+1));
+                        if (start>end)  return  new MessagePage(0,start-end,messages,componentToAddTo,indexofCurrentPage+1);
+                        return new MessagePage(0,end-start,messages,componentToAddTo,indexofCurrentPage+1);
 
 
+                    }
+                }
+
+            }
+
+            @Override
+            protected void done() {
+                try {
+
+
+                    MessagePage product =get() ;
+                    if (product != null){
+
+                        componentToAddTo.add(product);}
+                    System.out.println("Done");
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                } catch (ExecutionException e) {
+                   throw new RuntimeException(e);
+                }catch (CancellationException e){
+                    SwingUtilities.invokeLater(()->loadingMessagePageStatus.setText("Page  Not Available"));
+                }
+                if (cardLayoutMain.isNextCardAvailable()){
+                    cardLayoutMain.next(componentToAddTo);
+                }
+                isaMessagePageLoading = false;
+                loadingMessagePageStatus.setText("No Message Page Loading");
+            }
+        };
+
+        lazyLoader.execute();
+
+    }
+
+    public void setCurrentFolder(String currentFolder) {
+        this.currentFolder =  currentFolder;
+    }
+
+    public String getCurrentFolder() {
+        if (currentFolder.equalsIgnoreCase("Inbox")) return currentFolder;
+        return "[Gmail]/"+currentFolder;
+    }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {

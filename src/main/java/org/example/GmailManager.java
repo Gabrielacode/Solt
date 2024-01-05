@@ -104,9 +104,8 @@ public  class GmailManager  implements EmailManager{
             gmail_store = (IMAPStore) gmail_session.getStore("imaps");
             gmail_store.connect("imap.gmail.com", user_name,password);
     }
-    public  Folder loadFolderFromStore (String nameofFolder) throws MessagingException {
-        return  gmail_store.getFolder(nameofFolder);
-    }
+
+
     public ArrayList<Folder> loadFoldersFromSession() throws MessagingException {
 
        Folder[] gmailStoreFolders =  gmail_store.getDefaultFolder().list("*");
@@ -125,9 +124,10 @@ public  class GmailManager  implements EmailManager{
     }
 
     public Message[] loadMessagesFromInboxFolders(int start , int finish) throws MessagingException {
-        Folder user_inbox =  loadFolderFromStore("Inbox");
+        Folder user_inbox =  gmail_store.getFolder("Inbox");
         Message[] user_message;
       user_inbox.open(Folder.READ_ONLY);
+      if (user_inbox.getMessageCount()>0){
       if(start > finish){
           user_message = user_inbox.getMessages(finish,start);
           Arrays.sort(user_message, Comparator.comparing(Message::getMessageNumber).reversed());
@@ -135,13 +135,29 @@ public  class GmailManager  implements EmailManager{
       }
        user_message = user_inbox.getMessages(start,finish);
         return user_message;}
+    return null;
+    }
 
-    public Message[] loadMessagesFromAFolder(String folderName) throws MessagingException {
+
+    public Message[] loadMessagesFromAFolder(String folderName, int start, int end) throws MessagingException {
         Folder folder = gmail_store.getFolder(folderName);
         folder.open(Folder.READ_ONLY);
-        Message[] user_message = folder.getMessages();
-        return user_message;
-    }
+        Message[] user_message;
+        if (folder.getMessageCount()<=0){
+            return null;}
+
+
+
+        if(start > end){
+            user_message = folder.getMessages(end,start);
+            Arrays.sort(user_message, Comparator.comparing(Message::getMessageNumber).reversed());
+            return user_message;
+        }
+        user_message = folder.getMessages(start,end);
+        return user_message;}
+
+
+
 
     public String loadTextVersionofMessage(Part e) throws MessagingException, IOException {
         String result = "";
@@ -390,36 +406,6 @@ public  class GmailManager  implements EmailManager{
 
 
     public static void main(String[] args) {
-       try {
-            GmailManager gg = new GmailManager("gabrielukpehdev@gmail.com", "puhctufhitlutdqi");
-            gg.createEmailSession("gabrielukpehdev@gmail.com", "puhctufhitlutdqi");
 
-            gg.createEmailStoreFromServer();
-            gg.loadFoldersFromSession();
-            gg.sendTextEmailWithEverythingAndAnything("Hello","Hi",null,null,"gabrielukpehdev@gmail.com",null,null);
-
-          /**  Message [] me = gg.loadMessagesFromInboxFolders();
-           Arrays.stream(me).forEach((a)->{
-               try {
-                   System.out.println("Subject :"+ a.getSubject());
-                   System.out.println("Recieved Date "+ a.getReceivedDate().toString());
-                   System.out.println(gg.loadTextVersionofMessage((Message)a));
-                   System.out.println();
-               } catch (MessagingException e) {
-                   e.printStackTrace();
-               } catch (IOException e) {
-                   throw new RuntimeException(e);
-               }
-           });**/
-
-
-     } catch (MessagingException e) {
-         e.printStackTrace();
-     } catch (InvalidEmailMessageException e) {
-           e.printStackTrace();
-       }
-    }
-
-
-}
+}}
 

@@ -7,14 +7,11 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class Folders extends JButton {
     String name;
@@ -56,12 +53,14 @@ public class Folders extends JButton {
          addActionListener(new ActionListener() {
              @Override
              public void actionPerformed(ActionEvent e) {
+                 main.setCurrentFolder(folder.getName());
+                 System.out.println(main.getCurrentFolder());
                  try {
                      if (folder!=null&&folder.getType()==Folder.HOLDS_FOLDERS) {
                          JButton source = (JButton) e.getSource();
                          folderPopup.shows(Folders.this, mainPanelToBeAdded, source.getX(), source.getY());
                      }else {
-                       loadMessagePageForFolder(main.mainManager,main.messagesSpace,main.executors,folder);
+                       loadMessagePageForFolder(main.mainManager,main,main.messagesSpace,main.executors,folder);
                      }
                  } catch (MessagingException ex) {
                      throw new RuntimeException(ex);
@@ -71,55 +70,25 @@ public class Folders extends JButton {
 
     }
 
-    public  void loadMessagePageForFolder(GmailManager manager, JComponent messagesSpace, ExecutorService executors, Folder folder){
-        SwingWorker<Message[],Void> loadFolder = new SwingWorker<>() {
+    public  void loadMessagePageForFolder(GmailManager manager,MainUI mainInstance, JComponent messagesSpace, ExecutorService executors, Folder folder){
+        SwingWorker<Void,Void> loadFolder = new SwingWorker<>() {
             @Override
-            protected Message[] doInBackground() throws Exception {
-                if (folder.getName().equalsIgnoreCase("Inbox")) {
-                    return manager.loadMessagesFromInboxFolders(1,20);
-                }else return manager.loadMessagesFromAFolder("[Gmail]/"+folder.getName());
+            protected Void doInBackground() throws Exception {
+                String folderName = folder.getName().equalsIgnoreCase("Inbox")?"Inbox":"[Gmail]/"+folder.getName();
 
-            }
+                  /** if (messagesSpace.getComponentCount()>0) {
+                       return null;
+                   }else {
+                       mainInstance.lazyLoadEmails(folderName,messagesSpace,mainInstance.messageSpaceLayout);}
+                **/
 
-            @Override
-            protected void done() {
-                executors.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        messagesSpace.removeAll();
-                        ArrayList<MessagePage> messagePages = new ArrayList<>();
-                        Message[] result;
-                        try {
-                            result = get();
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        } catch (ExecutionException e) {
-                            throw new RuntimeException(e);
-                        }
-
-                        int userMessageLength = result.length;
-                        int countOfPages =0;
-                        for (int i = userMessageLength; i > 0; i--) {
-                            if ((userMessageLength-i)%MessagePage.getMaximumAmountOfEmailLabels(messagesSpace)==0){
-                                if (i-11<=0){
-                                    countOfPages++;
-                                    messagePages.add(new MessagePage(i,0,result,messagesSpace,countOfPages) );
-
-                                }else {
-                                    countOfPages++;
-                                    messagePages.add(new MessagePage(i, i - MessagePage.getMaximumAmountOfEmailLabels(messagesSpace), result, messagesSpace, countOfPages));
-
-                                }}else continue;
+                   mainInstance.lazyLoadEmailsFromFolder(folderName,messagesSpace,mainInstance.messageSpaceLayout,true);
 
 
-                        }
-
-                        messagePages.forEach((a) -> messagesSpace.add(a));
-
-                    }
-                });
+                return null;
             }
         };
+        System.out.println("Executing lazyloading" );
 
         loadFolder.execute();
     }
